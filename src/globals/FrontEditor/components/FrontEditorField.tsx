@@ -15,7 +15,7 @@ import {
 } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
-import { DragHandleIcon, EditIcon, MoreIcon, useConfig, useField } from '@payloadcms/ui/exports/client'
+import { DragHandleIcon, EditIcon, MoreIcon, useConfig, useField } from '@payloadcms/ui'
 
 import type { FrontEditor, Post } from '@/payload-types'
 
@@ -195,9 +195,13 @@ const FrontEditorField: ArrayFieldClientComponent = (props) => {
     const fetchPosts = async () => {
       const apiRoute = clientConfig?.routes?.api || '/api'
       const serverURL = clientConfig?.serverURL || ''
-      const url = new URL(`${serverURL}${apiRoute}/posts`)
+      const baseURL = serverURL || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000')
+      const url = apiRoute.startsWith('http') || apiRoute.startsWith('//')
+        ? new URL(`${apiRoute.replace(/\/$/, '')}/posts`)
+        : new URL(`${apiRoute.replace(/\/$/, '')}/posts`, baseURL)
 
       url.searchParams.set('where[_status][equals]', 'published')
+      url.searchParams.set('where[workflowStatus][equals]', 'published')
       url.searchParams.set('depth', '1')
       url.searchParams.set('limit', '100')
       url.searchParams.set('pagination', 'false')

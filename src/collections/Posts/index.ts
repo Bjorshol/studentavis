@@ -246,8 +246,54 @@ export const Posts: CollectionConfig<'posts'> = {
       ],
     },
     slugField(),
+    {
+      name: 'workflowStatus',
+      label: 'Status',
+      type: 'select',
+      defaultValue: 'drafted',
+      required: true,
+      options: [
+        {
+          label: 'Kladd',
+          value: 'drafted',
+        },
+        {
+          label: 'Ferdig',
+          value: 'finished',
+        },
+        {
+          label: 'Publisert',
+          value: 'published',
+        },
+      ],
+      admin: {
+        description: 'Sett arbeidsstatus for artikkelen.',
+        position: 'sidebar',
+      },
+    },
   ],
   hooks: {
+    beforeChange: [
+      ({ data }) => {
+        if (!data) return data
+
+        if (data.workflowStatus === 'published') {
+          return {
+            ...data,
+            _status: 'published',
+          }
+        }
+
+        if (data.workflowStatus === 'drafted' || data.workflowStatus === 'finished') {
+          return {
+            ...data,
+            _status: 'draft',
+          }
+        }
+
+        return data
+      },
+    ],
     afterChange: [syncFrontEditorFromPost, revalidatePost],
     afterRead: [populateAuthors],
     afterDelete: [revalidateDelete],
