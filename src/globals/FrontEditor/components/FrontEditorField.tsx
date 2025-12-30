@@ -24,9 +24,12 @@ import './frontEditorField.scss'
 
 type FrontEditorItem = NonNullable<FrontEditor['items']>[number]
 
-type PostSummary = Pick<Post, 'id' | 'title' | 'displaySize'> & {
+type PostSummary = Pick<Post, 'id' | 'title' | 'displaySize' | 'workflowStatus'> & {
+  _status?: Post['_status']
   heroImage?: Post['heroImage']
 }
+
+const MAX_FRONT_PAGE_ITEMS = 50
 
 const getPostId = (post: FrontEditorItem['post']): string | undefined => {
   if (!post) return undefined
@@ -66,6 +69,7 @@ const StackRow = ({
   onRemove,
   onSizeChange,
   disabled,
+  status,
 }: {
   adminRoute: string
   disabled: boolean
@@ -75,6 +79,7 @@ const StackRow = ({
   onRemove: (key: string) => void
   onSizeChange: (key: string, size: Post['displaySize']) => void
   post?: PostSummary | null
+  status: 'unpublished' | 'missing' | null
 }) => {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: sortableId,
@@ -103,6 +108,16 @@ const StackRow = ({
       </div>
       <div className="front-editor-field__stack-meta">
         <div className="front-editor-field__stack-title">{post?.title || 'Uten tittel'}</div>
+        {status === 'unpublished' && (
+          <p className="front-editor-field__status front-editor-field__status--warning">
+            Denne saken er ikke publisert og vil ikke vises på forsiden.
+          </p>
+        )}
+        {status === 'missing' && (
+          <p className="front-editor-field__status front-editor-field__status--error">
+            Klarte ikke å finne den valgte saken. Fjern den eller velg en ny.
+          </p>
+        )}
         <div className="front-editor-field__stack-controls">
           <label className="front-editor-field__size-label">
             Visningsstørrelse
@@ -185,6 +200,12 @@ const FrontEditorField: ArrayFieldClientComponent = (props) => {
   const stackItemKeys = stackItems.map((item, index) => getItemKey(item, index))
   const stackSortableIds = stackItemKeys.map((key) => `stack:${key}`)
 
+  const isPublishedPost = (post?: PostSummary | null) => {
+    if (!post) return false
+
+    return post.workflowStatus === 'published' || post._status === 'published'
+  }
+
   const { isOver: isOverStack, setNodeRef: setStackRef } = useDroppable({ id: 'front-stack' })
 
   useEffect(() => {
@@ -207,6 +228,8 @@ const FrontEditorField: ArrayFieldClientComponent = (props) => {
       url.searchParams.set('select[title]', 'true')
       url.searchParams.set('select[displaySize]', 'true')
       url.searchParams.set('select[heroImage]', 'true')
+      url.searchParams.set('select[_status]', 'true')
+      url.searchParams.set('select[workflowStatus]', 'true')
 
       try {
         const response = await fetch(url.toString(), {
@@ -248,6 +271,8 @@ const FrontEditorField: ArrayFieldClientComponent = (props) => {
           displaySize: (item.post as PostSummary).displaySize,
           heroImage: (item.post as PostSummary).heroImage,
           title: (item.post as PostSummary).title,
+          _status: (item.post as PostSummary)._status,
+          workflowStatus: (item.post as PostSummary).workflowStatus,
         })
       }
     })
@@ -306,6 +331,35 @@ const FrontEditorField: ArrayFieldClientComponent = (props) => {
   const disabled = Boolean(field?.admin?.readOnly)
   const adminRoute = clientConfig?.routes?.admin || '/admin'
 
+  const pinnedIds = useMemo(() => {
+    const ids = new Set<string>()
+
+    stackItems.forEach((item) => {
+      const postId = getPostId(item.post)
+      if (postId) ids.add(postId)
+    })
+
+    return ids
+  }, [stackItems])
+
+  const pinnedPublishedCount = useMemo(() => {
+    return stackItems.reduce((total, item) => {
+      const postId = getPostId(item.post)
+      if (!postId) return total
+
+      const post = postsById.get(postId)
+      return isPublishedPost(post) ? total + 1 : total
+    }, 0)
+  }, [postsById, stackItems])
+
+  const availableAutoCount = useMemo(() => {
+    return publishedPosts.filter((post) => isPublishedPost(post) && !pinnedIds.has(String(post.id))).length
+  }, [pinnedIds, publishedPosts])
+
+  const totalFrontPageCount = useMemo(() => {
+    return Math.min(MAX_FRONT_PAGE_ITEMS, pinnedPublishedCount + availableAutoCount)
+  }, [availableAutoCount, pinnedPublishedCount])
+
   const filteredPublished = useMemo(() => {
     if (!search.trim()) return publishedPosts
 
@@ -314,18 +368,45 @@ const FrontEditorField: ArrayFieldClientComponent = (props) => {
     )
   }, [publishedPosts, search])
 
+  const handleReset = () => {
+    setValue([])
+  }
+
   return (
     <div className="front-editor-field">
       {field?.label && <div className="front-editor-field__label">{field.label}</div>}
       {field?.admin?.description && (
         <div className="front-editor-field__description">{field.admin.description}</div>
       )}
+      <div className="front-editor-field__logic">
+        <div>
+          <p className="front-editor-field__logic-text">
+            Pinnede saker vises øverst i valgt rekkefølge. Resten av forsiden fylles automatisk med de nyeste
+            publiserte sakene (inntil {MAX_FRONT_PAGE_ITEMS} saker totalt).
+          </p>
+          <p className="front-editor-field__logic-text">
+            Du trenger ikke kurere alle {MAX_FRONT_PAGE_ITEMS} – kun det som skal være øverst.
+          </p>
+        </div>
+        <div className="front-editor-field__stats">
+          <div className="front-editor-field__stat">📌 Pinnet: {stackItems.length}</div>
+          <div className="front-editor-field__stat">📰 På forsiden: {totalFrontPageCount}</div>
+          <button
+            className="front-editor-field__reset"
+            disabled={disabled || stackItems.length === 0}
+            onClick={handleReset}
+            type="button"
+          >
+            Nullstill til automatisk
+          </button>
+        </div>
+      </div>
       <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd} sensors={sensors}>
         <div className="front-editor-field__columns">
           <div className="front-editor-field__column">
             <div className="front-editor-field__column-header">
-              <h3>Forside-stakk</h3>
-              <p>Sorter rekkefølge og visningsstørrelse.</p>
+              <h3>Pinnet øverst</h3>
+              <p>Rekkefølgen her bestemmer toppen av forsiden.</p>
             </div>
             <div
               className={`front-editor-field__stack${isOverStack ? ' is-over' : ''}`}
@@ -341,6 +422,12 @@ const FrontEditorField: ArrayFieldClientComponent = (props) => {
                   const postId = getPostId(item.post)
                   const post = postId ? postsById.get(postId) : undefined
 
+                  const status: 'unpublished' | 'missing' | null = post
+                    ? isPublishedPost(post)
+                      ? null
+                      : 'unpublished'
+                    : 'missing'
+
                   return (
                     <StackRow
                       adminRoute={adminRoute}
@@ -351,6 +438,7 @@ const FrontEditorField: ArrayFieldClientComponent = (props) => {
                       onRemove={handleRemove}
                       onSizeChange={handleSizeChange}
                       post={post}
+                      status={status}
                       sortableId={sortableId}
                     />
                   )
