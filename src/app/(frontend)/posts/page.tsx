@@ -20,8 +20,6 @@ export default async function Page() {
     limit: 12,
     overrideAccess: false,
     select: {
-      displaySize: true,
-      heroImage: true,
       title: true,
       slug: true,
       categories: true,

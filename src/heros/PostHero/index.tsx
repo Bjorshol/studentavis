@@ -15,17 +15,10 @@ export const PostHero: React.FC<{
     populatedAuthors && populatedAuthors.length > 0 && formatAuthors(populatedAuthors) !== ''
 
   return (
-    <div className="relative isolate -mt-[10.4rem] overflow-hidden bg-black text-white">
-      <div className="absolute inset-0">
-        {heroImage && typeof heroImage !== 'string' && (
-          <Media fill priority imgClassName="object-cover" resource={heroImage} />
-        )}
-        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-black/20" />
-      </div>
-
-      <div className="container relative z-10 max-w-5xl pb-14 pt-[13rem]">
-        <div className="flex flex-col gap-6">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/80">
+    <div className="relative -mt-[10.4rem] flex items-end">
+      <div className="container z-10 relative lg:grid lg:grid-cols-[1fr_48rem_1fr] text-white pb-8">
+        <div className="col-start-1 col-span-1 md:col-start-2 md:col-span-2">
+          <div className="uppercase text-sm mb-6">
             {categories?.map((category, index) => {
               if (typeof category === 'object' && category !== null) {
                 const { title: categoryTitle } = category
@@ -37,33 +30,43 @@ export const PostHero: React.FC<{
                 return (
                   <React.Fragment key={index}>
                     {titleToUse}
-                    {!isLast && <React.Fragment>&nbsp;•&nbsp;</React.Fragment>}
+                    {!isLast && <React.Fragment>, &nbsp;</React.Fragment>}
                   </React.Fragment>
                 )
               }
               return null
             })}
-          </p>
+          </div>
 
-          <h1 className="font-serif text-3xl leading-tight md:text-5xl lg:text-6xl">{title}</h1>
+          <div className="">
+            <h1 className="mb-6 text-3xl md:text-5xl lg:text-6xl">{title}</h1>
+          </div>
 
-          <div className="flex flex-col gap-3 text-sm text-white/80 sm:flex-row sm:items-center sm:gap-8">
+          <div className="flex flex-col md:flex-row gap-4 md:gap-16">
             {hasAuthors && (
-              <div className="flex flex-col gap-1">
-                <p className="uppercase tracking-[0.08em] text-xs">Forfatter</p>
-                <p className="text-base text-white">{formatAuthors(populatedAuthors)}</p>
+              <div className="flex flex-col gap-4">
+                <div className="flex flex-col gap-1">
+                  <p className="text-sm">Author</p>
+
+                  <p>{formatAuthors(populatedAuthors)}</p>
+                </div>
               </div>
             )}
             {publishedAt && (
               <div className="flex flex-col gap-1">
-                <p className="uppercase tracking-[0.08em] text-xs">Publisert</p>
-                <time className="text-base text-white" dateTime={publishedAt}>
-                  {formatDateTime(publishedAt)}
-                </time>
+                <p className="text-sm">Date Published</p>
+
+                <time dateTime={publishedAt}>{formatDateTime(publishedAt)}</time>
               </div>
             )}
           </div>
         </div>
+      </div>
+      <div className="min-h-[80vh] select-none">
+        {heroImage && typeof heroImage !== 'string' && (
+          <Media fill priority imgClassName="-z-10 object-cover" resource={heroImage} />
+        )}
+        <div className="absolute pointer-events-none left-0 bottom-0 w-full h-1/2 bg-gradient-to-t from-black to-transparent" />
       </div>
     </div>
   )

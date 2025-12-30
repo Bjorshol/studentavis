@@ -227,10 +227,6 @@ export interface Post {
   id: number;
   title: string;
   heroImage?: (number | null) | Media;
-  /**
-   * Velg om saken skal vises som en stor artikkel eller en liten stripe/teaser på forsiden.
-   */
-  displaySize?: ('large' | 'small') | null;
   content: {
     root: {
       type: string;
@@ -1197,7 +1193,6 @@ export interface FormBlockSelect<T extends boolean = true> {
 export interface PostsSelect<T extends boolean = true> {
   title?: T;
   heroImage?: T;
-  displaySize?: T;
   content?: T;
   relatedPosts?: T;
   categories?: T;

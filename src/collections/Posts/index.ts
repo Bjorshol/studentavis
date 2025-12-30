@@ -38,17 +38,15 @@ export const Posts: CollectionConfig<'posts'> = {
   // This config controls what's populated by default when a post is referenced
   // https://payloadcms.com/docs/queries/select#defaultpopulate-collection-config-property
   // Type safe if the collection slug generic is passed to `CollectionConfig` - `CollectionConfig<'posts'>
-    defaultPopulate: {
-      title: true,
-      slug: true,
-      categories: true,
-      meta: {
-        image: true,
-        description: true,
-      },
-      displaySize: true,
-      heroImage: true,
+  defaultPopulate: {
+    title: true,
+    slug: true,
+    categories: true,
+    meta: {
+      image: true,
+      description: true,
     },
+  },
   admin: {
     defaultColumns: ['title', 'slug', 'updatedAt'],
     livePreview: {
@@ -82,27 +80,6 @@ export const Posts: CollectionConfig<'posts'> = {
               name: 'heroImage',
               type: 'upload',
               relationTo: 'media',
-            },
-            {
-              name: 'displaySize',
-              type: 'select',
-              defaultValue: 'large',
-              options: [
-                {
-                  label: 'Stor artikkel',
-                  value: 'large',
-                },
-                {
-                  label: 'Liten artikkel',
-                  value: 'small',
-                },
-              ],
-              admin: {
-                description:
-                  'Velg om saken skal vises som en stor artikkel eller en liten stripe/teaser på forsiden.',
-                width: '50%',
-              },
-              label: 'Visningsstørrelse',
             },
             {
               name: 'content',
