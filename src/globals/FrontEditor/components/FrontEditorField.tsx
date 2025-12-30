@@ -15,7 +15,7 @@ import {
 } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
-import { DragHandleIcon, EditIcon, MoreIcon, useConfig, useField } from '@payloadcms/ui/exports/client'
+import { DragHandleIcon, EditIcon, MoreIcon, useConfig, useField } from '@payloadcms/ui'
 
 import type { FrontEditor, Post } from '@/payload-types'
 
