@@ -276,6 +276,7 @@ export interface Post {
   slug: string;
   updatedAt: string;
   createdAt: string;
+  workflowStatus?: ('drafted' | 'finished' | 'published') | null;
   _status?: ('draft' | 'published') | null;
 }
 /**
@@ -1112,6 +1113,7 @@ export interface PagesSelect<T extends boolean = true> {
   slug?: T;
   updatedAt?: T;
   createdAt?: T;
+  workflowStatus?: T;
   _status?: T;
 }
 /**
