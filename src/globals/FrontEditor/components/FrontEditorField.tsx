@@ -9,13 +9,14 @@ import {
   PointerSensor,
   closestCenter,
   useDroppable,
+  useDraggable,
   useSensor,
   useSensors,
   type DragEndEvent,
 } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
-import { DragHandleIcon, EditIcon, MoreIcon, useConfig, useField } from '@payloadcms/ui/exports/client'
+import { DragHandleIcon, EditIcon, MoreIcon, useConfig, useField } from '@payloadcms/ui'
 
 import type { FrontEditor, Post } from '@/payload-types'
 
@@ -59,20 +60,24 @@ const getHeroImage = (post?: PostSummary | null): string | undefined => {
 const StackRow = ({
   item,
   itemKey,
+  sortableId,
   post,
   adminRoute,
   onRemove,
   onSizeChange,
+  disabled,
 }: {
   adminRoute: string
+  disabled: boolean
   item: FrontEditorItem
   itemKey: string
+  sortableId: string
   onRemove: (key: string) => void
   onSizeChange: (key: string, size: Post['displaySize']) => void
   post?: PostSummary | null
 }) => {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-    id: itemKey,
+    id: sortableId,
     data: { type: 'stack' },
   })
 
@@ -132,17 +137,11 @@ const StackRow = ({
   )
 }
 
-const PublishedCard = ({
-  post,
-  onAdd,
-}: {
-  onAdd: (post: PostSummary) => void
-  post: PostSummary
-}) => {
+const PublishedCard = ({ post }: { post: PostSummary }) => {
   const postId = String(post.id)
   const heroImage = getHeroImage(post)
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-    id: `pool-${postId}`,
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useDraggable({
+    id: `post:${postId}`,
     data: { postId, type: 'pool' },
   })
 
@@ -163,9 +162,6 @@ const PublishedCard = ({
         {heroImage ? <img alt={post.title || 'Publisert sak'} src={heroImage} /> : <div className="front-editor-field__placeholder" />}
       </div>
       <div className="front-editor-field__pool-title">{post.title || 'Uten tittel'}</div>
-      <button className="front-editor-field__pool-add" disabled={isDragging} onClick={() => onAdd(post)} type="button">
-        Legg til på forsiden
-      </button>
     </div>
   )
 }
@@ -175,6 +171,7 @@ const FrontEditorField: ArrayFieldClientComponent = (props) => {
   const { value, setValue } = useField<FrontEditor['items']>({ path })
   const { config: clientConfig } = useConfig()
   const [publishedPosts, setPublishedPosts] = useState<PostSummary[]>([])
+  const [search, setSearch] = useState('')
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -186,8 +183,9 @@ const FrontEditorField: ArrayFieldClientComponent = (props) => {
 
   const stackItems = useMemo(() => (Array.isArray(value) ? value : []), [value])
   const stackItemKeys = stackItems.map((item, index) => getItemKey(item, index))
+  const stackSortableIds = stackItemKeys.map((key) => `stack:${key}`)
 
-  const { setNodeRef: setStackRef } = useDroppable({ id: 'front-stack' })
+  const { isOver: isOverStack, setNodeRef: setStackRef } = useDroppable({ id: 'front-stack' })
 
   useEffect(() => {
     const controller = new AbortController()
@@ -195,9 +193,13 @@ const FrontEditorField: ArrayFieldClientComponent = (props) => {
     const fetchPosts = async () => {
       const apiRoute = clientConfig?.routes?.api || '/api'
       const serverURL = clientConfig?.serverURL || ''
-      const url = new URL(`${serverURL}${apiRoute}/posts`)
+      const baseURL = serverURL || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000')
+      const url = apiRoute.startsWith('http') || apiRoute.startsWith('//')
+        ? new URL(`${apiRoute.replace(/\/$/, '')}/posts`)
+        : new URL(`${apiRoute.replace(/\/$/, '')}/posts`, baseURL)
 
       url.searchParams.set('where[_status][equals]', 'published')
+      url.searchParams.set('where[workflowStatus][equals]', 'published')
       url.searchParams.set('depth', '1')
       url.searchParams.set('limit', '100')
       url.searchParams.set('pagination', 'false')
@@ -206,17 +208,23 @@ const FrontEditorField: ArrayFieldClientComponent = (props) => {
       url.searchParams.set('select[displaySize]', 'true')
       url.searchParams.set('select[heroImage]', 'true')
 
-      const response = await fetch(url.toString(), {
-        credentials: 'include',
-        signal: controller.signal,
-      })
+      try {
+        const response = await fetch(url.toString(), {
+          credentials: 'include',
+          signal: controller.signal,
+        })
 
-      if (!response.ok) return
+        if (!response.ok) return
 
-      const data = await response.json()
+        const data = await response.json()
 
-      if (Array.isArray(data?.docs)) {
-        setPublishedPosts(data.docs as PostSummary[])
+        if (Array.isArray(data?.docs)) {
+          setPublishedPosts(data.docs as PostSummary[])
+        }
+      } catch (error) {
+        if ((error as Error)?.name !== 'AbortError') {
+          console.error('Failed to load published posts', error)
+        }
       }
     }
 
@@ -247,19 +255,6 @@ const FrontEditorField: ArrayFieldClientComponent = (props) => {
     return map
   }, [publishedPosts, stackItems])
 
-  const addPostToStack = (post: PostSummary) => {
-    const postId = String(post.id)
-    if (stackItems.some((item) => getPostId(item.post) === postId)) return
-
-    const newItem: FrontEditorItem = {
-      id: `stack-${postId}-${Date.now()}`,
-      post: postId,
-      displaySize: post.displaySize || 'large',
-    }
-
-    setValue([...(stackItems || []), newItem])
-  }
-
   const handleSizeChange = (itemKey: string, size: Post['displaySize']) => {
     const updated = stackItems.map((item, index) =>
       getItemKey(item, index) === itemKey ? { ...item, displaySize: size } : item,
@@ -282,8 +277,8 @@ const FrontEditorField: ArrayFieldClientComponent = (props) => {
     const overId = over.id as string
 
     if (activeType === 'stack') {
-      const oldIndex = stackItemKeys.indexOf(active.id as string)
-      const newIndex = stackItemKeys.indexOf(overId)
+      const oldIndex = stackSortableIds.indexOf(active.id as string)
+      const newIndex = stackSortableIds.indexOf(overId)
 
       if (oldIndex !== -1 && newIndex !== -1 && oldIndex !== newIndex) {
         setValue(arrayMove(stackItems, oldIndex, newIndex))
@@ -294,24 +289,30 @@ const FrontEditorField: ArrayFieldClientComponent = (props) => {
       const postId = active.data.current.postId
       if (stackItems.some((item) => getPostId(item.post) === postId)) return
 
-      const targetIndex = stackItemKeys.indexOf(overId)
+      const targetIndex = stackSortableIds.indexOf(overId)
+      const insertIndex = overId === 'front-stack' || targetIndex === -1 ? stackItems.length : targetIndex
       const newItem: FrontEditorItem = {
         id: `stack-${postId}-${Date.now()}`,
         post: postId,
         displaySize: postsById.get(postId)?.displaySize || 'large',
       }
 
-      if (targetIndex >= 0) {
-        const next = [...stackItems]
-        next.splice(targetIndex, 0, newItem)
-        setValue(next)
-      } else {
-        setValue([...(stackItems || []), newItem])
-      }
+      const next = [...stackItems]
+      next.splice(insertIndex, 0, newItem)
+      setValue(next)
     }
   }
 
+  const disabled = Boolean(field?.admin?.readOnly)
   const adminRoute = clientConfig?.routes?.admin || '/admin'
+
+  const filteredPublished = useMemo(() => {
+    if (!search.trim()) return publishedPosts
+
+    return publishedPosts.filter((post) =>
+      (post.title || '').toLowerCase().includes(search.trim().toLowerCase()),
+    )
+  }, [publishedPosts, search])
 
   return (
     <div className="front-editor-field">
@@ -326,25 +327,31 @@ const FrontEditorField: ArrayFieldClientComponent = (props) => {
               <h3>Forside-stakk</h3>
               <p>Sorter rekkefølge og visningsstørrelse.</p>
             </div>
-            <div className="front-editor-field__stack" ref={setStackRef}>
-              <SortableContext items={stackItemKeys} strategy={verticalListSortingStrategy}>
+            <div
+              className={`front-editor-field__stack${isOverStack ? ' is-over' : ''}`}
+              ref={setStackRef}
+            >
+              <SortableContext items={stackSortableIds} strategy={verticalListSortingStrategy}>
                 {stackItems.length === 0 && (
                   <div className="front-editor-field__empty">Dra inn en publisert sak for å bygge forsiden.</div>
                 )}
                 {stackItems.map((item, index) => {
                   const itemKey = stackItemKeys[index]
+                  const sortableId = stackSortableIds[index]
                   const postId = getPostId(item.post)
                   const post = postId ? postsById.get(postId) : undefined
 
                   return (
                     <StackRow
                       adminRoute={adminRoute}
+                      disabled={disabled}
                       item={item}
                       itemKey={itemKey}
-                      key={itemKey}
+                      key={sortableId}
                       onRemove={handleRemove}
                       onSizeChange={handleSizeChange}
                       post={post}
+                      sortableId={sortableId}
                     />
                   )
                 })}
@@ -355,16 +362,24 @@ const FrontEditorField: ArrayFieldClientComponent = (props) => {
             <div className="front-editor-field__column-header">
               <h3>Publiserte saker</h3>
               <p>Alle publiserte artikler kan dras inn i forsiden.</p>
+              <label className="front-editor-field__search">
+                <span className="sr-only">Søk etter tittel</span>
+                <input
+                  aria-label="Søk etter publisert artikkel"
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder="Søk etter tittel"
+                  type="search"
+                  value={search}
+                />
+              </label>
             </div>
             <div className="front-editor-field__pool">
-              <SortableContext
-                items={publishedPosts.map((post) => `pool-${post.id}`)}
-                strategy={verticalListSortingStrategy}
-              >
-                {publishedPosts.map((post) => (
-                  <PublishedCard key={post.id} onAdd={addPostToStack} post={post} />
-                ))}
-              </SortableContext>
+              {filteredPublished.length === 0 && (
+                <div className="front-editor-field__empty">Ingen publiserte artikler funnet.</div>
+              )}
+              {filteredPublished.map((post) => (
+                <PublishedCard key={post.id} post={post} />
+              ))}
             </div>
           </div>
         </div>
