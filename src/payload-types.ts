@@ -249,6 +249,9 @@ export interface Post {
     [k: string]: unknown;
   };
   relatedPosts?: (number | Post)[] | null;
+  /**
+   * Velg blant redaksjonelle kategorier.
+   */
   categories?: (number | Category)[] | null;
   meta?: {
     title?: string | null;
@@ -400,6 +403,9 @@ export interface FolderInterface {
  */
 export interface Category {
   id: number;
+  /**
+   * Redaksjonsstyrte kategorier. Listen er låst til fastsatte emner.
+   */
   title: string;
   /**
    * When enabled, the slug will auto-generate from the title field on save and autosave.

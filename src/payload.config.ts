@@ -15,6 +15,7 @@ import { FrontEditor } from './globals/FrontEditor/config'
 import { plugins } from './plugins'
 import { defaultLexical } from '@/fields/defaultLexical'
 import { getServerSideURL } from './utilities/getURL'
+import { ensureEditorialCategories } from './utilities/ensureEditorialCategories'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
@@ -86,5 +87,8 @@ export default buildConfig({
       },
     },
     tasks: [],
+  },
+  onInit: async (payload) => {
+    await ensureEditorialCategories(payload)
   },
 })
