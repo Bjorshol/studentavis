@@ -69,7 +69,7 @@ export default async function Page({ params: paramsPromise }: Args) {
   }
 
   const { hero, layout } = page
-  const homePosts = isHomePage ? await queryLatestPosts({ draft }) : []
+  const homePosts = isHomePage ? await queryFrontPagePosts({ draft }) : []
 
   return (
     <article className="pt-16 pb-24">
@@ -127,31 +127,80 @@ const queryPageBySlug = cache(async ({ slug }: { slug: string }) => {
   return result.docs?.[0] || null
 })
 
-const queryLatestPosts = cache(async ({ draft }: { draft: boolean }) => {
+const queryFrontPagePosts = cache(async ({ draft }: { draft: boolean }) => {
   const payload = await getPayload({ config: configPromise })
 
-  const posts = await payload.find({
-    collection: 'posts',
+  const frontEditor = await payload.findGlobal({
+    slug: 'front-editor',
     draft,
-    depth: 1,
-    limit: 6,
+    depth: 2,
     overrideAccess: draft,
-    pagination: false,
-    sort: '-publishedAt',
-    select: {
-      heroImage: true,
-      meta: true,
-      slug: true,
-      title: true,
-    },
   })
 
-  return posts.docs
+  const configuredPosts: FrontPagePost[] = []
+  const usedPostIds = new Set<string>()
+
+  for (const item of frontEditor.items || []) {
+    const post = item?.post
+
+    if (post && typeof post === 'object' && 'id' in post) {
+      configuredPosts.push({
+        displaySize: (item?.displaySize || post.displaySize) ?? 'large',
+        post: post as HomePost,
+      })
+      usedPostIds.add(post.id as string)
+    } else if (typeof post === 'string') {
+      usedPostIds.add(post)
+    }
+  }
+
+  const remaining = Math.max(0, 50 - configuredPosts.length)
+
+  let fallbackPosts: FrontPagePost[] = []
+
+  if (remaining > 0) {
+    const fallbackResult = await payload.find({
+      collection: 'posts',
+      draft,
+      depth: 2,
+      limit: remaining,
+      overrideAccess: draft,
+      pagination: false,
+      select: {
+        displaySize: true,
+        heroImage: true,
+        meta: true,
+        slug: true,
+        title: true,
+      },
+      sort: '-publishedAt',
+      where: usedPostIds.size
+        ? {
+            id: {
+              not_in: Array.from(usedPostIds),
+            },
+          }
+        : undefined,
+    })
+
+    fallbackPosts = fallbackResult.docs.map((post) => ({
+      displaySize: post.displaySize ?? 'large',
+      post: post as HomePost,
+    }))
+  }
+
+  return [...configuredPosts, ...fallbackPosts]
 })
 
 type HomePost = RequiredDataFromCollectionSlug<'posts'>
 
+type FrontPagePost = {
+  displaySize: HomePost['displaySize']
+  post: HomePost
+}
+
 type FrontPost = {
+  displaySize: HomePost['displaySize']
   title: string
   description?: string | null
   href?: string
@@ -161,7 +210,7 @@ type FrontPost = {
 const playfair = Playfair_Display({ subsets: ['latin'], weight: ['700', '800', '900'] })
 const inter = Inter({ subsets: ['latin'], weight: ['400', '600', '700'] })
 
-const normalizePost = (post: HomePost): FrontPost => {
+const normalizePost = (post: HomePost, displaySize: HomePost['displaySize']): FrontPost => {
   const imageFromHero =
     post.heroImage && typeof post.heroImage === 'object' && 'url' in post.heroImage
       ? post.heroImage.url
@@ -173,6 +222,7 @@ const normalizePost = (post: HomePost): FrontPost => {
       : null
 
   return {
+    displaySize,
     description: post.meta?.description,
     href: post.slug ? `/posts/${post.slug}` : undefined,
     image: imageFromHero || imageFromMeta,
@@ -180,37 +230,10 @@ const normalizePost = (post: HomePost): FrontPost => {
   }
 }
 
-const fallbackPosts: FrontPost[] = [
-  {
-    description: 'Oppsummering av hvordan studentene ble tatt for fjorårets juks.',
-    href: '#',
-    title: 'Se oversikt: Slik jukset Inn-studentene i fjor',
-  },
-  {
-    description: 'Student utestengt etter at private bilder kom på avveie.',
-    href: '#',
-    image: '/website-template-OG.webp',
-    title: 'Bilder kom på avveie: Student utestengt i flere år',
-  },
-  {
-    description: 'Rektor lover at pengene skal styrke både studier og forskningsmiljø.',
-    href: '#',
-    image: '/website-template-OG.webp',
-    title: 'Universitetet får 1,5 milliarder kroner',
-  },
-  {
-    description: 'Kulden har lagt seg over Lillehammer – se de nye vinterbildene.',
-    href: '#',
-    image: '/website-template-OG.webp',
-    title: 'Nå er det vinter i Lillehammer',
-  },
-]
+const HomeLanding: React.FC<{ posts: FrontPagePost[] }> = ({ posts }) => {
+  const frontPagePosts = posts.map(({ displaySize, post }) => normalizePost(post, displaySize ?? 'large'))
 
-const HomeLanding: React.FC<{ posts: HomePost[] }> = ({ posts }) => {
-  const frontPagePosts = posts.map(normalizePost)
-  const cards = frontPagePosts.length >= 4 ? frontPagePosts : [...frontPagePosts, ...fallbackPosts].slice(0, 4)
-
-  const [highlight, leadStory, followUp, secondaryLead] = cards
+  if (!frontPagePosts.length) return null
 
   const cardBaseClasses =
     'block w-full border border-neutral-200 bg-white text-neutral-900 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md'
@@ -218,37 +241,23 @@ const HomeLanding: React.FC<{ posts: HomePost[] }> = ({ posts }) => {
   return (
     <div className="bg-[#f2f3ea] py-10">
       <div className="mx-auto flex w-full max-w-[720px] flex-col gap-6 px-4">
-        {highlight && (
-          <ArticleSmall
-            cardClasses={cardBaseClasses}
-            post={highlight}
-            titleClassName="text-[1.8rem] leading-tight"
-          />
-        )}
-
-        {leadStory && (
-          <ArticleLarge
-            cardClasses={cardBaseClasses}
-            post={leadStory}
-            titleClassName="text-[2.2rem] leading-snug"
-          />
-        )}
-
-        {followUp && (
-          <ArticleSmall
-            cardClasses={cardBaseClasses}
-            post={followUp}
-            showImage
-            titleClassName="text-[1.8rem] leading-tight"
-          />
-        )}
-
-        {secondaryLead && (
-          <ArticleLarge
-            cardClasses={cardBaseClasses}
-            post={secondaryLead}
-            titleClassName="text-[2.1rem] leading-snug"
-          />
+        {frontPagePosts.map((frontPost, index) =>
+          frontPost.displaySize === 'small' ? (
+            <ArticleSmall
+              cardClasses={cardBaseClasses}
+              key={frontPost.href || `${frontPost.title}-${index}`}
+              post={frontPost}
+              showImage
+              titleClassName="text-[1.6rem] leading-tight"
+            />
+          ) : (
+            <ArticleLarge
+              cardClasses={cardBaseClasses}
+              key={frontPost.href || `${frontPost.title}-${index}`}
+              post={frontPost}
+              titleClassName="text-[2rem] leading-snug"
+            />
+          )
         )}
       </div>
     </div>

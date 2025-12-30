@@ -112,10 +112,12 @@ export interface Config {
   globals: {
     header: Header;
     footer: Footer;
+    'front-editor': FrontEditor;
   };
   globalsSelect: {
     header: HeaderSelect<false> | HeaderSelect<true>;
     footer: FooterSelect<false> | FooterSelect<true>;
+    'front-editor': FrontEditorSelect<false> | FrontEditorSelect<true>;
   };
   locale: null;
   user: User & {
@@ -1694,6 +1696,28 @@ export interface Footer {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "front-editor".
+ */
+export interface FrontEditor {
+  id: number;
+  /**
+   * Velg hvilke saker som skal vises på forsiden, juster rekkefølge, og sett størrelse. Øverst vises øverst på forsiden.
+   */
+  items?:
+    | {
+        post: number | Post;
+        /**
+         * Størrelsen synkroniseres med feltet for visningsstørrelse i selve saken.
+         */
+        displaySize?: ('large' | 'small') | null;
+        id?: string | null;
+      }[]
+    | null;
+  updatedAt?: string | null;
+  createdAt?: string | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "header_select".
  */
 export interface HeaderSelect<T extends boolean = true> {
@@ -1732,6 +1756,22 @@ export interface FooterSelect<T extends boolean = true> {
               url?: T;
               label?: T;
             };
+        id?: T;
+      };
+  updatedAt?: T;
+  createdAt?: T;
+  globalType?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "front-editor_select".
+ */
+export interface FrontEditorSelect<T extends boolean = true> {
+  items?:
+    | T
+    | {
+        post?: T;
+        displaySize?: T;
         id?: T;
       };
   updatedAt?: T;
