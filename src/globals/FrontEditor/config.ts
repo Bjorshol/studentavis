@@ -21,6 +21,9 @@ export const FrontEditor: GlobalConfig = {
         initCollapsed: true,
         description:
           'Velg hvilke saker som skal vises på forsiden, juster rekkefølge, og sett størrelse. Øverst vises øverst på forsiden.',
+        components: {
+          Field: '@/globals/FrontEditor/components/FrontEditorField',
+        },
       },
       fields: [
         {

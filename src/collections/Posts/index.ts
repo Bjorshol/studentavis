@@ -27,6 +27,7 @@ import {
   PreviewField,
 } from '@payloadcms/plugin-seo/fields'
 import { slugField } from 'payload'
+import { ALLOWED_CATEGORY_SLUGS } from '@/constants/editorialCategories'
 
 export const Posts: CollectionConfig<'posts'> = {
   slug: 'posts',
@@ -149,8 +150,14 @@ export const Posts: CollectionConfig<'posts'> = {
               type: 'relationship',
               admin: {
                 position: 'sidebar',
+                description: 'Velg blant redaksjonelle kategorier.',
               },
               hasMany: true,
+              filterOptions: () => ({
+                slug: {
+                  in: ALLOWED_CATEGORY_SLUGS,
+                },
+              }),
               relationTo: 'categories',
             },
           ],
