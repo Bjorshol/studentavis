@@ -20,7 +20,7 @@ export const FrontEditor: GlobalConfig = {
       admin: {
         initCollapsed: true,
         description:
-          'Velg hvilke saker som skal vises på forsiden, juster rekkefølge, og sett størrelse. Øverst vises øverst på forsiden.',
+          'Pinn saker som skal vises øverst. Resten fylles automatisk fra nyeste publiserte saker. Maks 50 vises på forsiden.',
         components: {
           Field: '@/globals/FrontEditor/components/FrontEditorField',
         },
