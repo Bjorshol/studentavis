@@ -15,6 +15,7 @@ import {
 } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
+import { DragHandleIcon, EditIcon, MoreIcon, useConfig, useField } from '@payloadcms/ui'
 import { DragHandleIcon, EditIcon, MoreIcon, useConfig, useField } from '@payloadcms/ui/exports/client'
 
 import type { FrontEditor, Post } from '@/payload-types'
@@ -63,12 +64,14 @@ const StackRow = ({
   adminRoute,
   onRemove,
   onSizeChange,
+  disabled,
 }: {
   adminRoute: string
   item: FrontEditorItem
   itemKey: string
   onRemove: (key: string) => void
   onSizeChange: (key: string, size: Post['displaySize']) => void
+  disabled: boolean
   post?: PostSummary | null
 }) => {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -172,6 +175,7 @@ const PublishedCard = ({
 
 const FrontEditorField: ArrayFieldClientComponent = (props) => {
   const { path, field } = props
+  const disabled = (props as { readOnly?: boolean }).readOnly ?? false
   const { value, setValue } = useField<FrontEditor['items']>({ path })
   const { config: clientConfig } = useConfig()
   const [publishedPosts, setPublishedPosts] = useState<PostSummary[]>([])
@@ -339,6 +343,7 @@ const FrontEditorField: ArrayFieldClientComponent = (props) => {
                   return (
                     <StackRow
                       adminRoute={adminRoute}
+                      disabled={disabled}
                       item={item}
                       itemKey={itemKey}
                       key={itemKey}
