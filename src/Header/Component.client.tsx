@@ -3,10 +3,10 @@ import { useHeaderTheme } from '@/providers/HeaderTheme'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import React, { useEffect, useState } from 'react'
-import { Inter, Playfair_Display } from 'next/font/google'
 
 import type { Header } from '@/payload-types'
 
+import { Logo } from '@/components/Logo/Logo'
 import { HeaderNav } from './Nav'
 
 interface HeaderClientProps {
@@ -30,19 +30,13 @@ export const HeaderClient: React.FC<HeaderClientProps> = ({ data }) => {
   }, [headerTheme])
 
   return (
-    <header
-      className="sticky top-0 z-40 w-full border-b border-[#0b5d18]/40 bg-[#0b5d18] text-white shadow-md"
-      {...(theme ? { 'data-theme': theme } : {})}
-    >
-      <div className="mx-auto flex h-16 w-full max-w-[960px] items-center justify-between px-5">
-        <Link className="flex items-center gap-3" href="/">
-          <span className={`${playfair.className} text-2xl font-extrabold text-white`}>Innposten</span>
+    <header className="container relative z-20   " {...(theme ? { 'data-theme': theme } : {})}>
+      <div className="py-8 flex justify-between">
+        <Link href="/">
+          <Logo loading="eager" priority="high" className="invert dark:invert-0" />
         </Link>
-        <HeaderNav className={inter.className} data={data} />
+        <HeaderNav data={data} />
       </div>
     </header>
   )
 }
-
-const playfair = Playfair_Display({ subsets: ['latin'], weight: ['700', '800', '900'] })
-const inter = Inter({ subsets: ['latin'], weight: ['400', '600', '700'] })

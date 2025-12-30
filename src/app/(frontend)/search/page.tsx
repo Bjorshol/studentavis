@@ -22,8 +22,6 @@ export default async function Page({ searchParams: searchParamsPromise }: Args) 
     depth: 1,
     limit: 12,
     select: {
-      displaySize: true,
-      heroImage: true,
       title: true,
       slug: true,
       categories: true,
