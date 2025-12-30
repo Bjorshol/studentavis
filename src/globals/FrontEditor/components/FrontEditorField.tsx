@@ -210,17 +210,23 @@ const FrontEditorField: ArrayFieldClientComponent = (props) => {
       url.searchParams.set('select[displaySize]', 'true')
       url.searchParams.set('select[heroImage]', 'true')
 
-      const response = await fetch(url.toString(), {
-        credentials: 'include',
-        signal: controller.signal,
-      })
+      try {
+        const response = await fetch(url.toString(), {
+          credentials: 'include',
+          signal: controller.signal,
+        })
 
-      if (!response.ok) return
+        if (!response.ok) return
 
-      const data = await response.json()
+        const data = await response.json()
 
-      if (Array.isArray(data?.docs)) {
-        setPublishedPosts(data.docs as PostSummary[])
+        if (Array.isArray(data?.docs)) {
+          setPublishedPosts(data.docs as PostSummary[])
+        }
+      } catch (error) {
+        if ((error as Error)?.name !== 'AbortError') {
+          console.error('Failed to load published posts', error)
+        }
       }
     }
 
