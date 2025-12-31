@@ -139,29 +139,17 @@ const queryFrontPagePosts = cache(async ({ draft }: { draft: boolean }) => {
     overrideAccess: draft,
   })
 
-  const pinnedItems = frontPage.items || []
+  const curatedEntries = (Array.isArray(frontPage.stack) ? frontPage.stack : []) as Array<
+    HomePost | string | number
+  >
 
-  // Ordering algorithm: keep curated posts on top (in stored order), then auto-fill with the latest
-  // published posts, always limiting the total list to MAX_FRONT_PAGE_ITEMS.
-  const pinnedIds = pinnedItems.reduce((ids, item) => {
-    const rawPost = item?.post
-
-    if (rawPost && typeof rawPost === 'object' && 'id' in rawPost) {
-      ids.add(String(rawPost.id))
-    }
-
-    if (typeof rawPost === 'string') {
-      ids.add(rawPost)
-    }
-
-    return ids
-  }, new Set<string>())
+  const hasCuratedEntries = curatedEntries.length > 0
 
   const publishedResult = await payload.find({
     collection: 'posts',
     draft,
     depth: 2,
-    limit: MAX_FRONT_PAGE_ITEMS + pinnedIds.size,
+    limit: MAX_FRONT_PAGE_ITEMS + Math.max(curatedEntries.length, MAX_FRONT_PAGE_ITEMS),
     overrideAccess: draft,
     pagination: false,
     select: {
@@ -172,6 +160,7 @@ const queryFrontPagePosts = cache(async ({ draft }: { draft: boolean }) => {
       title: true,
       workflowStatus: true,
       _status: true,
+      publishedAt: true,
     },
     sort: '-publishedAt',
     where: {
@@ -187,53 +176,46 @@ const queryFrontPagePosts = cache(async ({ draft }: { draft: boolean }) => {
     publishedById.set(String(post.id), post)
   })
 
-  const curatedTop: FrontPagePost[] = []
+  const curatedTop: HomePost[] = []
   const curatedIds = new Set<string>()
 
-  for (const item of pinnedItems) {
-    const rawPost = item?.post
+  for (const entry of curatedEntries) {
     const postId =
-      typeof rawPost === 'object' && rawPost && 'id' in rawPost
-        ? String(rawPost.id)
-        : typeof rawPost === 'string'
-          ? rawPost
+      entry && typeof entry === 'object' && 'id' in entry
+        ? String(entry.id)
+        : entry
+          ? String(entry)
           : null
 
-    if (!postId || curatedIds.has(postId)) continue
+    if (!postId) continue
+    if (curatedIds.has(postId)) continue
 
-    const hydratedPost =
-      (rawPost && typeof rawPost === 'object' && 'id' in rawPost
-        ? (rawPost as HomePost)
-        : publishedById.get(postId)) || null
+    const source =
+      entry && typeof entry === 'object' && 'id' in entry
+        ? (entry as HomePost)
+        : publishedById.get(postId)
 
-    if (!hydratedPost || hydratedPost.workflowStatus !== 'published' || hydratedPost._status !== 'published') continue
+    if (!source || source.workflowStatus !== 'published' || source._status !== 'published') continue
 
-    curatedTop.push({
-      displaySize: (item?.displaySize || hydratedPost.displaySize) ?? 'large',
-      post: hydratedPost,
-    })
     curatedIds.add(postId)
+    curatedTop.push(source)
   }
 
-  const remainingSlots = Math.max(0, MAX_FRONT_PAGE_ITEMS - curatedTop.length)
-
-  const automaticFill = publishedPosts
+  const availableSlots = Math.max(0, MAX_FRONT_PAGE_ITEMS - curatedTop.length)
+  const fillers = publishedPosts
     .filter((post) => !curatedIds.has(String(post.id)))
-    .slice(0, remainingSlots)
-    .map((post) => ({
-      displaySize: post.displaySize ?? 'large',
-      post,
-    }))
+    .slice(0, hasCuratedEntries ? availableSlots : MAX_FRONT_PAGE_ITEMS)
 
-  return [...curatedTop, ...automaticFill]
+  if (!hasCuratedEntries) {
+    return fillers
+  }
+
+  return [...curatedTop, ...fillers]
 })
 
 type HomePost = RequiredDataFromCollectionSlug<'posts'>
 
-type FrontPagePost = {
-  displaySize: HomePost['displaySize']
-  post: HomePost
-}
+type FrontPagePost = HomePost
 
 type FrontPost = {
   displaySize: HomePost['displaySize']
@@ -246,7 +228,7 @@ type FrontPost = {
 const playfair = Playfair_Display({ subsets: ['latin'], weight: ['700', '800', '900'] })
 const inter = Inter({ subsets: ['latin'], weight: ['400', '600', '700'] })
 
-const normalizePost = (post: HomePost, displaySize: HomePost['displaySize']): FrontPost => {
+const normalizePost = (post: HomePost): FrontPost => {
   const imageFromHero =
     post.heroImage && typeof post.heroImage === 'object' && 'url' in post.heroImage
       ? post.heroImage.url
@@ -258,7 +240,7 @@ const normalizePost = (post: HomePost, displaySize: HomePost['displaySize']): Fr
       : null
 
   return {
-    displaySize,
+    displaySize: post.displaySize ?? 'large',
     description: post.meta?.description,
     href: post.slug ? `/posts/${post.slug}` : undefined,
     image: imageFromHero || imageFromMeta,
@@ -267,7 +249,7 @@ const normalizePost = (post: HomePost, displaySize: HomePost['displaySize']): Fr
 }
 
 const HomeLanding: React.FC<{ posts: FrontPagePost[] }> = ({ posts }) => {
-  const frontPagePosts = posts.map(({ displaySize, post }) => normalizePost(post, displaySize ?? 'large'))
+  const frontPagePosts = posts.map((post) => normalizePost(post))
 
   if (!frontPagePosts.length) return null
 
