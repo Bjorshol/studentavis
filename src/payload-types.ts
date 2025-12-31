@@ -274,9 +274,12 @@ export interface Post {
    */
   generateSlug?: boolean | null;
   slug: string;
+  /**
+   * Sett arbeidsstatus for artikkelen.
+   */
+  workflowStatus: 'drafted' | 'finished' | 'published';
   updatedAt: string;
   createdAt: string;
-  workflowStatus?: ('drafted' | 'finished' | 'published') | null;
   _status?: ('draft' | 'published') | null;
 }
 /**
@@ -1113,7 +1116,6 @@ export interface PagesSelect<T extends boolean = true> {
   slug?: T;
   updatedAt?: T;
   createdAt?: T;
-  workflowStatus?: T;
   _status?: T;
 }
 /**
@@ -1228,6 +1230,7 @@ export interface PostsSelect<T extends boolean = true> {
       };
   generateSlug?: T;
   slug?: T;
+  workflowStatus?: T;
   updatedAt?: T;
   createdAt?: T;
   _status?: T;
@@ -1709,7 +1712,7 @@ export interface Footer {
 export interface FrontEditor {
   id: number;
   /**
-   * Velg hvilke saker som skal vises på forsiden, juster rekkefølge, og sett størrelse. Øverst vises øverst på forsiden.
+   * Pinn saker som skal vises øverst. Resten fylles automatisk fra nyeste publiserte saker. Maks 50 vises på forsiden.
    */
   items?:
     | {
