@@ -17,7 +17,6 @@ import { MediaBlock } from '../../blocks/MediaBlock/config'
 import { generatePreviewPath } from '../../utilities/generatePreviewPath'
 import { populateAuthors } from './hooks/populateAuthors'
 import { revalidateDelete, revalidatePost } from './hooks/revalidatePost'
-import { syncFrontEditorFromPost } from './hooks/syncFrontEditorFromPost'
 
 import {
   MetaDescriptionField,
@@ -294,7 +293,7 @@ export const Posts: CollectionConfig<'posts'> = {
         return data
       },
     ],
-    afterChange: [syncFrontEditorFromPost, revalidatePost],
+    afterChange: [revalidatePost],
     afterRead: [populateAuthors],
     afterDelete: [revalidateDelete],
   },

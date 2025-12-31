@@ -132,14 +132,14 @@ const queryPageBySlug = cache(async ({ slug }: { slug: string }) => {
 const queryFrontPagePosts = cache(async ({ draft }: { draft: boolean }) => {
   const payload = await getPayload({ config: configPromise })
 
-  const frontEditor = await payload.findGlobal({
-    slug: 'front-editor',
+  const frontPage = await payload.findGlobal({
+    slug: 'front-page',
     draft,
     depth: 2,
     overrideAccess: draft,
   })
 
-  const pinnedItems = frontEditor.items || []
+  const pinnedItems = frontPage.items || []
 
   // Ordering algorithm: keep curated posts on top (in stored order), then auto-fill with the latest
   // published posts, always limiting the total list to MAX_FRONT_PAGE_ITEMS.

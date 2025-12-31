@@ -112,12 +112,12 @@ export interface Config {
   globals: {
     header: Header;
     footer: Footer;
-    'front-editor': FrontEditor;
+    'front-page': FrontPage;
   };
   globalsSelect: {
     header: HeaderSelect<false> | HeaderSelect<true>;
     footer: FooterSelect<false> | FooterSelect<true>;
-    'front-editor': FrontEditorSelect<false> | FrontEditorSelect<true>;
+    'front-page': FrontPageSelect<false> | FrontPageSelect<true>;
   };
   locale: null;
   user: User & {
@@ -1707,19 +1707,16 @@ export interface Footer {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "front-editor".
+ * via the `definition` "front-page".
  */
-export interface FrontEditor {
+export interface FrontPage {
   id: number;
   /**
-   * Pinn saker som skal vises øverst. Resten fylles automatisk fra nyeste publiserte saker. Maks 50 vises på forsiden.
+   * Velg rekkefølgen på sakene som skal vises på forsiden. Dra og slipp for å endre rekkefølge, og velg om hver sak skal vises som stor eller liten.
    */
   items?:
     | {
         post: number | Post;
-        /**
-         * Størrelsen synkroniseres med feltet for visningsstørrelse i selve saken.
-         */
         displaySize?: ('large' | 'small') | null;
         id?: string | null;
       }[]
@@ -1775,9 +1772,9 @@ export interface FooterSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "front-editor_select".
+ * via the `definition` "front-page_select".
  */
-export interface FrontEditorSelect<T extends boolean = true> {
+export interface FrontPageSelect<T extends boolean = true> {
   items?:
     | T
     | {

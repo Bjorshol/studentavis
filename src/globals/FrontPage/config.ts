@@ -1,9 +1,7 @@
 import type { GlobalConfig } from 'payload'
 
-import { syncFrontEditorDisplaySizes } from './hooks/syncFrontEditorDisplaySizes'
-
-export const FrontEditor: GlobalConfig = {
-  slug: 'front-editor',
+export const FrontPageLayout: GlobalConfig = {
+  slug: 'front-page',
   access: {
     read: () => true,
   },
@@ -16,14 +14,15 @@ export const FrontEditor: GlobalConfig = {
       name: 'items',
       type: 'array',
       label: 'Forsidesaker',
+      labels: {
+        singular: 'Sak',
+        plural: 'Saker',
+      },
       maxRows: 50,
       admin: {
-        initCollapsed: true,
         description:
-          'Pinn saker som skal vises øverst. Resten fylles automatisk fra nyeste publiserte saker. Maks 50 vises på forsiden.',
-        components: {
-          Field: '@/globals/FrontEditor/components/FrontEditorField',
-        },
+          'Velg rekkefølgen på sakene som skal vises på forsiden. Dra og slipp for å endre rekkefølge, og velg om hver sak skal vises som stor eller liten.',
+        initCollapsed: true,
       },
       fields: [
         {
@@ -31,11 +30,13 @@ export const FrontEditor: GlobalConfig = {
           type: 'relationship',
           relationTo: 'posts',
           required: true,
+          label: 'Sak',
         },
         {
           name: 'displaySize',
           type: 'select',
           defaultValue: 'large',
+          label: 'Visningsstørrelse',
           options: [
             {
               label: 'Stor',
@@ -47,15 +48,10 @@ export const FrontEditor: GlobalConfig = {
             },
           ],
           admin: {
-            description: 'Størrelsen synkroniseres med feltet for visningsstørrelse i selve saken.',
             width: '50%',
           },
-          label: 'Visningsstørrelse',
         },
       ],
     },
   ],
-  hooks: {
-    afterChange: [syncFrontEditorDisplaySizes],
-  },
 }
