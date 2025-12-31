@@ -16,6 +16,8 @@ import PageClient from './page.client'
 import { LivePreviewListener } from '@/components/LivePreviewListener'
 import { homeStatic } from '@/endpoints/seed/home-static'
 
+const MAX_FRONT_PAGE_ITEMS = 50
+
 export async function generateStaticParams() {
   const payload = await getPayload({ config: configPromise })
   const pages = await payload.find({
@@ -137,59 +139,93 @@ const queryFrontPagePosts = cache(async ({ draft }: { draft: boolean }) => {
     overrideAccess: draft,
   })
 
-  const configuredPosts: FrontPagePost[] = []
-  const usedPostIds = new Set<string>()
+  const pinnedItems = frontEditor.items || []
 
-  for (const item of frontEditor.items || []) {
-    const post = item?.post
+  // Ordering algorithm: keep curated posts on top (in stored order), then auto-fill with the latest
+  // published posts, always limiting the total list to MAX_FRONT_PAGE_ITEMS.
+  const pinnedIds = pinnedItems.reduce((ids, item) => {
+    const rawPost = item?.post
 
-    if (post && typeof post === 'object' && 'id' in post) {
-      configuredPosts.push({
-        displaySize: (item?.displaySize || post.displaySize) ?? 'large',
-        post: post as HomePost,
-      })
-      usedPostIds.add(post.id as string)
-    } else if (typeof post === 'string') {
-      usedPostIds.add(post)
+    if (rawPost && typeof rawPost === 'object' && 'id' in rawPost) {
+      ids.add(String(rawPost.id))
     }
-  }
 
-  const remaining = Math.max(0, 50 - configuredPosts.length)
+    if (typeof rawPost === 'string') {
+      ids.add(rawPost)
+    }
 
-  let fallbackPosts: FrontPagePost[] = []
+    return ids
+  }, new Set<string>())
 
-  if (remaining > 0) {
-    const fallbackResult = await payload.find({
-      collection: 'posts',
-      draft,
-      depth: 2,
-      limit: remaining,
-      overrideAccess: draft,
-      pagination: false,
-      select: {
-        displaySize: true,
-        heroImage: true,
-        meta: true,
-        slug: true,
-        title: true,
-      },
-      sort: '-publishedAt',
-      where: usedPostIds.size
-        ? {
-            id: {
-              not_in: Array.from(usedPostIds),
-            },
-          }
-        : undefined,
+  const publishedResult = await payload.find({
+    collection: 'posts',
+    draft,
+    depth: 2,
+    limit: MAX_FRONT_PAGE_ITEMS + pinnedIds.size,
+    overrideAccess: draft,
+    pagination: false,
+    select: {
+      displaySize: true,
+      heroImage: true,
+      meta: true,
+      slug: true,
+      title: true,
+      workflowStatus: true,
+      _status: true,
+    },
+    sort: '-publishedAt',
+    where: {
+      _status: { equals: 'published' },
+      workflowStatus: { equals: 'published' },
+    },
+  })
+
+  const publishedPosts = publishedResult.docs.map((post) => post as HomePost)
+  const publishedById = new Map<string, HomePost>()
+
+  publishedPosts.forEach((post) => {
+    publishedById.set(String(post.id), post)
+  })
+
+  const curatedTop: FrontPagePost[] = []
+  const curatedIds = new Set<string>()
+
+  for (const item of pinnedItems) {
+    const rawPost = item?.post
+    const postId =
+      typeof rawPost === 'object' && rawPost && 'id' in rawPost
+        ? String(rawPost.id)
+        : typeof rawPost === 'string'
+          ? rawPost
+          : null
+
+    if (!postId || curatedIds.has(postId)) continue
+
+    const hydratedPost =
+      (rawPost && typeof rawPost === 'object' && 'id' in rawPost
+        ? (rawPost as HomePost)
+        : publishedById.get(postId)) || null
+
+    if (!hydratedPost || hydratedPost.workflowStatus !== 'published' || hydratedPost._status !== 'published') continue
+
+    curatedTop.push({
+      displaySize: (item?.displaySize || hydratedPost.displaySize) ?? 'large',
+      post: hydratedPost,
     })
-
-    fallbackPosts = fallbackResult.docs.map((post) => ({
-      displaySize: post.displaySize ?? 'large',
-      post: post as HomePost,
-    }))
+    curatedIds.add(postId)
   }
 
-  return [...configuredPosts, ...fallbackPosts]
+  const remainingSlots = Math.max(0, MAX_FRONT_PAGE_ITEMS - curatedTop.length)
+
+  const automaticFill = publishedPosts
+    .filter((post) => !curatedIds.has(String(post.id)))
+    .slice(0, remainingSlots)
+    .map((post) => ({
+      displaySize: post.displaySize ?? 'large',
+      post,
+    }))
+
+  return [...curatedTop, ...automaticFill]
 })
 
 type HomePost = RequiredDataFromCollectionSlug<'posts'>
