@@ -424,6 +424,10 @@ const FrontEditorField: ArrayFieldClientComponent = (props) => {
     setValue(next)
   }
 
+  const handleReset = () => {
+    setValue([])
+  }
+
   return (
     <div className="front-editor-field">
       {field?.label && <div className="front-editor-field__label">{field.label}</div>}
