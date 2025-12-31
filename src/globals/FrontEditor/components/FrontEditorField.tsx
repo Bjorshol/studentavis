@@ -406,7 +406,7 @@ const FrontEditorField: ArrayFieldClientComponent = (props) => {
     )
   }, [automaticQueue, search])
 
-  const handleReset = () => {
+  const resetPinnedStack = () => {
     setValue([])
   }
 
@@ -450,7 +450,7 @@ const FrontEditorField: ArrayFieldClientComponent = (props) => {
           <button
             className="front-editor-field__reset"
             disabled={disabled || stackItems.length === 0}
-            onClick={handleReset}
+            onClick={resetPinnedStack}
             type="button"
           >
             Nullstill til automatisk
