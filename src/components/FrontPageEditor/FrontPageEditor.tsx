@@ -1,7 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 'use client'
 
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { Button, FieldError, FieldLabel, useConfig, useField, useTranslation } from '@payloadcms/ui'
 import {
@@ -52,6 +52,7 @@ export const FrontPageEditorField: React.FC<FieldProps> = ({ label, path, requir
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
 
   const stackIds = useMemo(() => (Array.isArray(value) ? value.map(String) : []), [value])
+  const allowedIds = useMemo(() => new Set(posts.map((post) => post.id)), [posts])
 
   const stackPosts = useMemo(() => {
     return stackIds.map((id) => {
@@ -121,6 +122,31 @@ export const FrontPageEditorField: React.FC<FieldProps> = ({ label, path, requir
     return () => controller.abort()
   }, [config.serverURL, t])
 
+  const sanitizeStack = useCallback(
+    (ids: string[]) => {
+      const unique: string[] = []
+      const seen = new Set<string>()
+
+      for (const raw of ids) {
+        const id = String(raw)
+        if (!allowedIds.has(id) || seen.has(id)) continue
+
+        unique.push(id)
+        seen.add(id)
+
+        if (unique.length >= MAX_ITEMS) break
+      }
+
+      return unique
+    },
+    [allowedIds],
+  )
+
+  const updateStack = (ids: string[]) => {
+    const sanitized = sanitizeStack(ids)
+    setValue(sanitized)
+  }
+
   const addToStack = (postId: string, index?: number) => {
     if (stackIds.includes(postId) || stackIds.length >= MAX_ITEMS) return
 
@@ -128,12 +154,12 @@ export const FrontPageEditorField: React.FC<FieldProps> = ({ label, path, requir
     const targetIndex = typeof index === 'number' && index >= 0 ? Math.min(index, next.length) : next.length
 
     next.splice(targetIndex, 0, postId)
-    setValue(next)
+    updateStack(next)
   }
 
   const removeFromStack = (postId: string) => {
     const next = stackIds.filter((id) => id !== postId)
-    setValue(next)
+    updateStack(next)
   }
 
   const handleDragEnd = (event: DragEndEvent) => {
@@ -149,7 +175,7 @@ export const FrontPageEditorField: React.FC<FieldProps> = ({ label, path, requir
     if (activeInStack && overInStack && activeId !== overId) {
       const oldIndex = stackIds.indexOf(activeId)
       const newIndex = stackIds.indexOf(overId)
-      setValue(arrayMove(stackIds, oldIndex, newIndex))
+      updateStack(arrayMove(stackIds, oldIndex, newIndex))
       return
     }
 
@@ -158,6 +184,18 @@ export const FrontPageEditorField: React.FC<FieldProps> = ({ label, path, requir
       addToStack(activeId, insertIndex)
     }
   }
+
+  useEffect(() => {
+    if (posts.length === 0) return
+
+    const sanitized = sanitizeStack(stackIds)
+    const differs =
+      sanitized.length !== stackIds.length || sanitized.some((id, index) => id !== stackIds[index])
+
+    if (differs) {
+      setValue(sanitized)
+    }
+  }, [posts, sanitizeStack, setValue, stackIds])
 
   return (
     <div className="field-type front-editor">
