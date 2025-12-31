@@ -11,47 +11,18 @@ export const FrontPageLayout: GlobalConfig = {
   },
   fields: [
     {
-      name: 'items',
-      type: 'array',
-      label: 'Forsidesaker',
-      labels: {
-        singular: 'Sak',
-        plural: 'Saker',
-      },
+      name: 'stack',
+      type: 'relationship',
+      label: 'Forsideordre',
+      relationTo: 'posts',
+      hasMany: true,
       maxRows: 50,
       admin: {
-        description:
-          'Velg rekkefølgen på sakene som skal vises på forsiden. Dra og slipp for å endre rekkefølge, og velg om hver sak skal vises som stor eller liten.',
-        initCollapsed: true,
+        description: 'Dra publiserte saker inn i ønsket rekkefølge for forsiden.',
+        components: {
+          Field: '@/components/FrontPageEditor/FrontPageEditor#FrontPageEditorField',
+        },
       },
-      fields: [
-        {
-          name: 'post',
-          type: 'relationship',
-          relationTo: 'posts',
-          required: true,
-          label: 'Sak',
-        },
-        {
-          name: 'displaySize',
-          type: 'select',
-          defaultValue: 'large',
-          label: 'Visningsstørrelse',
-          options: [
-            {
-              label: 'Stor',
-              value: 'large',
-            },
-            {
-              label: 'Liten',
-              value: 'small',
-            },
-          ],
-          admin: {
-            width: '50%',
-          },
-        },
-      ],
     },
   ],
 }
