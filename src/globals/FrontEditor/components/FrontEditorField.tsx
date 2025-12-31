@@ -43,13 +43,33 @@ const getPostId = (post: FrontEditorItem['post']): string | undefined => {
   return undefined
 }
 
-const getItemKey = (item: FrontEditorItem, index: number): string => {
+const getExistingStackId = (item: FrontEditorItem): string | undefined => {
   if (item?.id) return String(item.id)
 
   const relatedPostId = getPostId(item.post)
   if (relatedPostId) return `stack-${relatedPostId}`
 
-  return `stack-${index}`
+  return undefined
+}
+
+const uniqueSuffix = (): string => {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID()
+  }
+
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`
+}
+
+const ensureUniqueStackId = (item: FrontEditorItem, usedIds: Set<string>): string => {
+  const baseId = getExistingStackId(item) || `stack-${uniqueSuffix()}`
+
+  let candidate = baseId
+  while (usedIds.has(candidate)) {
+    candidate = `${baseId}-${uniqueSuffix()}`
+  }
+
+  usedIds.add(candidate)
+  return candidate
 }
 
 const getHeroImage = (post?: PostSummary | null): string | undefined => {
@@ -231,8 +251,28 @@ const FrontEditorField: ArrayFieldClientComponent = (props) => {
   )
 
   const stackItems = useMemo(() => (Array.isArray(value) ? value : []), [value])
-  const stackItemKeys = stackItems.map((item, index) => getItemKey(item, index))
-  const stackSortableIds = stackItemKeys.map((key) => `stack:${key}`)
+  const stackItemIds = useMemo(() => {
+    const used = new Set<string>()
+
+    return stackItems.map((item, index) => {
+      const fallbackId = `stack-${index}`
+      const existingId = getExistingStackId(item) || fallbackId
+
+      if (!used.has(existingId)) {
+        used.add(existingId)
+        return existingId
+      }
+
+      let candidate = `${existingId}-dup`
+      while (used.has(candidate)) {
+        candidate = `${existingId}-${uniqueSuffix()}`
+      }
+
+      used.add(candidate)
+      return candidate
+    })
+  }, [stackItems])
+  const stackSortableIds = stackItemIds.map((key) => `stack:${key}`)
 
   const isPublishedPost = (post?: PostSummary | null) => {
     if (!post) return false
@@ -314,17 +354,45 @@ const FrontEditorField: ArrayFieldClientComponent = (props) => {
     return map
   }, [publishedPosts, stackItems])
 
+  useEffect(() => {
+    if (stackItems.length === 0) return
+
+    const usedIds = new Set<string>()
+    let changed = false
+
+    const normalized = stackItems.map((item) => {
+      const id = ensureUniqueStackId(item, usedIds)
+      if (item.id === id) return item
+
+      changed = true
+      return { ...item, id }
+    })
+
+    if (changed) {
+      setValue(normalized)
+    }
+  }, [setValue, stackItems])
+
   const handleSizeChange = (itemKey: string, size: Post['displaySize']) => {
     const updated = stackItems.map((item, index) =>
-      getItemKey(item, index) === itemKey ? { ...item, displaySize: size } : item,
+      stackItemIds[index] === itemKey ? { ...item, displaySize: size } : item,
     )
 
     setValue(updated)
   }
 
   const handleRemove = (itemKey: string) => {
-    const updated = stackItems.filter((item, index) => getItemKey(item, index) !== itemKey)
+    const updated = stackItems.filter((_, index) => stackItemIds[index] !== itemKey)
     setValue(updated)
+  }
+
+  const createStackItem = (postId: string, usedIds: Set<string>): FrontEditorItem => {
+    const baseItem: FrontEditorItem = {
+      post: postId,
+      displaySize: postsById.get(postId)?.displaySize || 'large',
+    }
+
+    return { ...baseItem, id: ensureUniqueStackId(baseItem, usedIds) }
   }
 
   const handleDragEnd = (event: DragEndEvent) => {
@@ -350,11 +418,7 @@ const FrontEditorField: ArrayFieldClientComponent = (props) => {
 
       const targetIndex = stackSortableIds.indexOf(overId)
       const insertIndex = overId === 'front-stack' || targetIndex === -1 ? stackItems.length : targetIndex
-      const newItem: FrontEditorItem = {
-        id: `stack-${postId}-${Date.now()}`,
-        post: postId,
-        displaySize: postsById.get(postId)?.displaySize || 'large',
-      }
+      const newItem = createStackItem(postId, new Set(stackItemIds))
 
       const next = [...stackItems]
       next.splice(insertIndex, 0, newItem)
@@ -414,11 +478,7 @@ const FrontEditorField: ArrayFieldClientComponent = (props) => {
     if (!postId) return
     if (stackItems.some((item) => getPostId(item.post) === postId)) return
 
-    const newItem: FrontEditorItem = {
-      id: `stack-${postId}-${Date.now()}`,
-      post: postId,
-      displaySize: postsById.get(postId)?.displaySize || 'large',
-    }
+    const newItem = createStackItem(postId, new Set(stackItemIds))
 
     const next = position === 'start' ? [newItem, ...stackItems] : [...stackItems, newItem]
     setValue(next)
@@ -475,7 +535,7 @@ const FrontEditorField: ArrayFieldClientComponent = (props) => {
                   </div>
                 )}
                 {stackItems.map((item, index) => {
-                  const itemKey = stackItemKeys[index]
+                  const itemKey = stackItemIds[index]
                   const sortableId = stackSortableIds[index]
                   const postId = getPostId(item.post)
                   const post = postId ? postsById.get(postId) : undefined
