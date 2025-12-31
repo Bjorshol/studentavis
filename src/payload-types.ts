@@ -1710,17 +1710,11 @@ export interface Footer {
  * via the `definition` "front-page".
  */
 export interface FrontPage {
-  id: number;
+ id: number;
   /**
-   * Velg rekkefølgen på sakene som skal vises på forsiden. Dra og slipp for å endre rekkefølge, og velg om hver sak skal vises som stor eller liten.
+   * Dra publiserte saker til ønsket rekkefølge for forsiden.
    */
-  items?:
-    | {
-        post: number | Post;
-        displaySize?: ('large' | 'small') | null;
-        id?: string | null;
-      }[]
-    | null;
+  stack?: (number | Post)[] | null;
   updatedAt?: string | null;
   createdAt?: string | null;
 }
@@ -1775,13 +1769,7 @@ export interface FooterSelect<T extends boolean = true> {
  * via the `definition` "front-page_select".
  */
 export interface FrontPageSelect<T extends boolean = true> {
-  items?:
-    | T
-    | {
-        post?: T;
-        displaySize?: T;
-        id?: T;
-      };
+  stack?: T;
   updatedAt?: T;
   createdAt?: T;
   globalType?: T;
